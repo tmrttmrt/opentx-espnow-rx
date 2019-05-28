@@ -3,6 +3,7 @@
 #include <string.h>
 #include <assert.h>
 #include <Arduino.h>
+#include <EEPROM.h>
 #include <WifiEspNow.h>
 #include "esprx.h"
 #include "uCRC16Lib.h"
@@ -10,7 +11,7 @@
 #define EVT_QUEUE_SIZE 
 
 static RXPacket_t packet;
-static struct WifiEspNowPeerInfo txPeer = {{ 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF },1};
+static struct WifiEspNowPeerInfo txPeer = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,1};
 
 uint32_t volatile packRecv = 0;
 uint32_t volatile packAckn = 0;
@@ -66,6 +67,8 @@ static inline void process_bind(const uint8_t mac[6], TXPacket_t *rp) {
       packet.crc=0;
       packet.crc = uCRC16Lib::calculate((char *) &packet, sizeof(packet));
       WifiEspNow.send(txPeer.mac, (const uint8_t *) &packet, sizeof(packet));
+      EEPROM.put(0,txPeer);
+      EEPROM.commit();
     }
     else {
       Serial.printf("Bind packet CRC error: %d vs %d", crc, rp->crc);
@@ -95,8 +98,11 @@ void recv_cb(const uint8_t mac[6], const uint8_t* buf, size_t count, void* cbarg
     Serial.printf("Wrong packet size: %d (must be %d)\n",  count, sizeof(TXPacket_t));
   }
 }
-
+ 
 void initRX(){
+
+  EEPROM.begin(sizeof(txPeer));
+  EEPROM.get(0,txPeer);
 
   if (!WifiEspNow.begin()) {
     Serial.println("WifiEspNow.begin() failed");
