@@ -15,8 +15,10 @@ void setup() {
   Serial.begin(115200);
   Serial.println();
 
+#if defined(ESP32)  
 //  WiFi.persistent(false);
-//  WiFi.mode(WIFI_AP);
+  WiFi.mode(WIFI_AP);
+#endif
 //  WiFi.softAP("ESPNOW-RX", nullptr, 1);
 //  WiFi.softAPdisconnect(false);
 
@@ -28,8 +30,9 @@ void setup() {
 
 void loop()
 {
-  char buff[8*10];
+  static char buff[8*10];
   delay(1000);
+  checkEEPROM();
   *buff = 0;
   char *p = buff;
   for(int i = 0; i < 8; i++){
@@ -38,4 +41,5 @@ void loop()
   }
   Serial.println( "Data age (ms): " + String(millis()- recvTime)+ " received: " + String(packRecv));
   Serial.println(buff);
+  
 }

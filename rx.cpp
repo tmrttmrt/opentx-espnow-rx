@@ -8,11 +8,13 @@
 #include "esprx.h"
 #include "uCRC16Lib.h"
 
-#define EVT_QUEUE_SIZE 
+#define BIND_TIMEOUT 10000
 
+static struct WifiEspNowPeerInfo txPeer = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},1};
 static RXPacket_t packet;
-static struct WifiEspNowPeerInfo txPeer = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF,1};
-
+static volatile bool dirty = false;
+static volatile bool bindEnabled = true;
+static uint32_t startTime;
 uint32_t volatile packRecv = 0;
 uint32_t volatile packAckn = 0;
 uint32_t volatile recvTime = 0;
@@ -41,7 +43,13 @@ static bool packet_check(TXPacket_t * rxp)
 static inline void process_data(const uint8_t mac[6], TXPacket_t *rp){
   if (packet_check(rp)) {
     recvTime = millis();
+#if defined(ESP32)
+    portENTER_CRITICAL(&timerMux);
+#endif
     memcpy( (void*) locChannelOutputs, rp->ch, sizeof(locChannelOutputs) );
+#if defined(ESP32)
+    portEXIT_CRITICAL(&timerMux);
+#endif
     packRecv++;
     WifiEspNow.send(txPeer.mac, (const uint8_t *) &packet, sizeof(packet));
   }
@@ -67,8 +75,7 @@ static inline void process_bind(const uint8_t mac[6], TXPacket_t *rp) {
       packet.crc=0;
       packet.crc = uCRC16Lib::calculate((char *) &packet, sizeof(packet));
       WifiEspNow.send(txPeer.mac, (const uint8_t *) &packet, sizeof(packet));
-      EEPROM.put(0,txPeer);
-      EEPROM.commit();
+      dirty = true;
     }
     else {
       Serial.printf("Bind packet CRC error: %d vs %d", crc, rp->crc);
@@ -80,9 +87,9 @@ static inline void process_bind(const uint8_t mac[6], TXPacket_t *rp) {
 }
 
 void recv_cb(const uint8_t mac[6], const uint8_t* buf, size_t count, void* cbarg) {
-  if ( sizeof(TXPacket_t) == count ){
+  if (sizeof(TXPacket_t) == count) {
     TXPacket_t *rp = (TXPacket_t *) buf;
-    if(BIND == rp->type){
+    if (bindEnabled && BIND == rp->type) {
       process_bind(mac, rp);
     } 
     else if (DATA == rp->type) {
@@ -98,9 +105,26 @@ void recv_cb(const uint8_t mac[6], const uint8_t* buf, size_t count, void* cbarg
     Serial.printf("Wrong packet size: %d (must be %d)\n",  count, sizeof(TXPacket_t));
   }
 }
+
+void checkEEPROM() {
+  if (dirty) {
+    disablePPM();
+    EEPROM.put(0,txPeer);
+//    EEPROM.commit();
+    dirty = false;
+    enablePPM();
+  }
+  if (bindEnabled) {
+    if(millis()-startTime > BIND_TIMEOUT) {
+      bindEnabled = false;
+    }
+  }
+}
  
 void initRX(){
 
+  startTime = millis();
+  
   EEPROM.begin(sizeof(txPeer));
   EEPROM.get(0,txPeer);
 
@@ -111,11 +135,11 @@ void initRX(){
 
   WifiEspNow.onReceive(recv_cb, nullptr);
 
-  if (!WifiEspNow.addPeer(txPeer.mac, 1)) {
+  if (!WifiEspNow.addPeer(txPeer.mac, txPeer.channel)) {
     Serial.printf("WifiEspNow.addPeer() failed MAC: %s", mac2str(txPeer.mac));
 
   }
-  if (!WifiEspNow.addPeer(broadcast_mac, 1)) {
+  if (!WifiEspNow.addPeer(broadcast_mac, txPeer.channel)) {
     Serial.printf("WifiEspNow.addPeer() failed: MAC: %s", mac2str(broadcast_mac));
 
   }
