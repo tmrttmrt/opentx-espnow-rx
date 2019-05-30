@@ -1,10 +1,3 @@
-#include <WifiEspNow.h>
-#if defined(ESP8266)
-#include <ESP8266WiFi.h>
-//Binding (broadcast) from esp32 seems to work only with non-os-sdk 2.2.2
-#elif defined(ESP32)
-#include <WiFi.h>
-#endif
 #include "esprx.h"
 
 
@@ -14,16 +7,6 @@ extern uint32_t volatile recvTime;
 void setup() {
   Serial.begin(115200);
   Serial.println();
-
-#if defined(ESP32)  
-//  WiFi.persistent(false);
-  WiFi.mode(WIFI_AP);
-#endif
-//  WiFi.softAP("ESPNOW-RX", nullptr, 1);
-//  WiFi.softAPdisconnect(false);
-
-//  Serial.print("MAC address of this node is ");
-//  Serial.println(WiFi.softAPmacAddress());
   initRX();
   initPPM();
 }

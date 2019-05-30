@@ -4,11 +4,23 @@
 #include <assert.h>
 #include <Arduino.h>
 #include <EEPROM.h>
+#if defined(ESP8266)
+#include <ESP8266WiFi.h>
+//Binding (broadcast) from esp32 seems to work only with non-os-sdk 2.2.2
+#elif defined(ESP32)
+#include <WiFi.h>
+#endif
 #include <WifiEspNow.h>
 #include "esprx.h"
 #include "uCRC16Lib.h"
 
 #define BIND_TIMEOUT 10000
+#if defined(ESP8266)
+#define ADD_PEER(mac, chan, mode) WifiEspNow.addPeer(mac, chan)
+#elif defined(ESP32)
+#define ADD_PEER(mac, chan, mode)  WifiEspNow.addPeer(mac, chan, NULL, (int)mode) 
+#endif
+
 
 static struct WifiEspNowPeerInfo txPeer = {{0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF},1};
 static RXPacket_t packet;
@@ -68,8 +80,8 @@ static inline void process_bind(const uint8_t mac[6], TXPacket_t *rp) {
       Serial.printf("Got bind MAC: %s", mac2str(mac));
       memcpy(txPeer.mac, mac, sizeof(txPeer.mac));
       txPeer.channel = rp->ch[0];
-      if (!WifiEspNow.hasPeer(txPeer.mac)) {
-        WifiEspNow.addPeer(txPeer.mac, txPeer.channel);
+      if (!ADD_PEER(txPeer.mac, txPeer.channel, ESP_IF_WIFI_STA)) {
+        Serial.printf("ADD_PEER() failed MAC: %s", mac2str(txPeer.mac));
       }
       packet.type = BIND;
       packet.crc=0;
@@ -127,6 +139,10 @@ void initRX(){
   
   EEPROM.begin(sizeof(txPeer));
   EEPROM.get(0,txPeer);
+  
+#if defined(ESP32)  
+  WiFi.mode(WIFI_STA);
+#endif
 
   if (!WifiEspNow.begin()) {
     Serial.println("WifiEspNow.begin() failed");
@@ -135,12 +151,12 @@ void initRX(){
 
   WifiEspNow.onReceive(recv_cb, nullptr);
 
-  if (!WifiEspNow.addPeer(txPeer.mac, txPeer.channel)) {
-    Serial.printf("WifiEspNow.addPeer() failed MAC: %s", mac2str(txPeer.mac));
+  if (!ADD_PEER(txPeer.mac, txPeer.channel, ESP_IF_WIFI_STA)) {
+    Serial.printf("ADD_PEER() failed MAC: %s", mac2str(txPeer.mac));
 
   }
-  if (!WifiEspNow.addPeer(broadcast_mac, txPeer.channel)) {
-    Serial.printf("WifiEspNow.addPeer() failed: MAC: %s", mac2str(broadcast_mac));
+  if (!ADD_PEER(broadcast_mac, txPeer.channel, ESP_IF_WIFI_STA)) {
+    Serial.printf("ADD_PEER() failed: MAC: %s", mac2str(broadcast_mac));
 
   }
 }
