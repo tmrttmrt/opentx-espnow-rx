@@ -1,7 +1,6 @@
 #include <Arduino.h>
 #include "esprx.h"
 
-#define GPIO_PPM_PIN  12
 #define US_TICKS  5
 #define POLARITY 1
 
@@ -13,6 +12,7 @@ portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 #endif
 
 int16_t locChannelOutputs[MAX_OUTPUT_CHANNELS];
+int16_t fsChannelOutputs[MAX_OUTPUT_CHANNELS];
 static volatile uint32_t pulses[20];
 static volatile uint32_t *ptr;
 static volatile int outLevel;
