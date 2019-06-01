@@ -6,7 +6,6 @@
 #define GPIO_LED_PIN LED_BUILTIN
 #define BIND_TIMEOUT 2000
 #define FS_TIMEOUT 1000
-#define BIND_CH 1
 
 const uint8_t broadcast_mac[6] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };
 extern volatile uint32_t packRecv;
