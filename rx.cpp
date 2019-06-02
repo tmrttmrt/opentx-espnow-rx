@@ -46,6 +46,7 @@ static RXPacket_t packet;
 static volatile bool dirty = false;
 static volatile bool bindEnabled = true;
 static uint32_t startTime;
+static bool ppmStarted = false;
 uint32_t volatile packRecv = 0;
 uint32_t volatile packAckn = 0;
 uint32_t volatile recvTime = 0;
@@ -83,9 +84,13 @@ static inline void process_data(const uint8_t mac[6], TXPacket_t *rp){
     portEXIT_CRITICAL(&timerMux);
 #endif
     packRecv++;
-    WifiEspNow.send(txPeer.mac, (const uint8_t *) &packet, sizeof(packet));
-    if (FSAFE == rp->type) {
-      dirty = true;
+    WifiEspNow.send(txPeer.mac, (const uint8_t *) &packet, sizeof(packet)); //Send ACK
+//    if (FSAFE == rp->type) {
+//      dirty = true;
+//    }
+    if (!ppmStarted && !bindEnabled) {
+      initPPM();
+      ppmStarted = true;
     }
   }
   else {
@@ -102,7 +107,8 @@ static inline void process_bind(const uint8_t mac[6], TXPacket_t *rp) {
     if(crc == rp->crc){
       Serial.printf("Got bind MAC: %s", mac2str(mac));
       memcpy(txPeer.mac, mac, sizeof(txPeer.mac));
-      txPeer.channel = rp->ch[0];
+      memcpy( (void*) fsChannelOutputs, rp->ch, sizeof(locChannelOutputs) );
+      txPeer.channel = rp->idx;
       if (!ADD_PEER(txPeer.mac, txPeer.channel, ESP_IF_WIFI_STA)) {
         Serial.printf("ADD_PEER() failed MAC: %s", mac2str(txPeer.mac));
       }
@@ -194,16 +200,17 @@ void initRX(){
 
   startTime = millis();
   pinMode(GPIO_LED_PIN, OUTPUT);
-  digitalWrite(GPIO_LED_PIN,0);
   
   EEPROM.begin(sizeof(txPeer)+sizeof(fsChannelOutputs));
   EEPROM.get(0,txPeer);
   EEPROM.get(sizeof(txPeer), fsChannelOutputs);
 
 #if defined(ESP8266)
-    WiFi.mode(WIFI_STA);
-    wifi_set_channel(BIND_CH);  
-#elif defined(ESP32)  
+  digitalWrite(GPIO_LED_PIN,0);
+  WiFi.mode(WIFI_STA);
+  wifi_set_channel(BIND_CH);  
+#elif defined(ESP32)
+  digitalWrite(GPIO_LED_PIN,1);
   WiFi.mode(WIFI_STA);
   esp_wifi_set_channel(BIND_CH, (wifi_second_chan_t) 0);
 #endif

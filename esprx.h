@@ -2,9 +2,9 @@
 #define ESPRX_H
 #include "esprc_packet.h"
 
-#define GPIO_PPM_PIN  5
+#define GPIO_PPM_PIN 5
 #define GPIO_LED_PIN LED_BUILTIN
-#define BIND_TIMEOUT 2000
+#define BIND_TIMEOUT 1000
 #define FS_TIMEOUT 1000
 
 const uint8_t broadcast_mac[6] = { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF };

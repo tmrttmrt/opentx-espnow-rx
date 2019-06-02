@@ -28,6 +28,12 @@ static hw_timer_t *timer = NULL;
 portMUX_TYPE timerMux = portMUX_INITIALIZER_UNLOCKED;
 #endif
 
+enum PPMState_t {
+  PPM_UNINIT,
+  PPM_DISABLED,
+  PPM_ENABLED,
+};
+
 int16_t locChannelOutputs[MAX_OUTPUT_CHANNELS];
 int16_t fsChannelOutputs[MAX_OUTPUT_CHANNELS];
 static volatile uint32_t pulses[20];
@@ -35,7 +41,7 @@ static volatile uint32_t *ptr;
 static volatile int outLevel;
 static unsigned int mask = 1;
 static int frameLength = 22; //22 ms 
-static volatile bool ppmEnabled = true;
+static volatile PPMState_t ppmState = PPM_UNINIT;
 
 
 IRAM_ATTR void setupPulsesPPM(int channelsStart)
@@ -81,10 +87,10 @@ IRAM_ATTR void timer_callback()
   outLevel++;
   outLevel = outLevel & mask;
   if ( 0 == *ptr) {
-    if (ppmEnabled){
+    if (PPM_ENABLED == ppmState){
       setupPulsesPPM(0);
     }
-    intEn = ppmEnabled;
+    intEn = PPM_ENABLED == ppmState;
   }
 #if defined(ESP8266)
   timer1_write(*ptr++);
@@ -110,6 +116,7 @@ void initPPM() {
   timer = timerBegin(0, 16, true); // 5 MHz
   timerAttachInterrupt(timer, timer_callback, true);
 #endif
+  ppmState = PPM_ENABLED;
   setupPulsesPPM(0);
   timer_callback();
 #if defined(ESP32)  
@@ -118,15 +125,19 @@ void initPPM() {
 }
 
 void disablePPM(){
-  ppmEnabled = false;
-  delay(2*frameLength);
+  if (PPM_ENABLED == ppmState) {
+    ppmState = PPM_DISABLED;
+    delay(2*frameLength);
+  }
 }
 
 void enablePPM(){
-  ppmEnabled = true;
+  if (PPM_DISABLED == ppmState) {
+    ppmState = PPM_ENABLED;
 #if defined(ESP32)  
-  timerRestart(timer);
+    timerRestart(timer);
 #endif  
+  }
 }
 
 int16_t get_ch(uint16_t idx){
