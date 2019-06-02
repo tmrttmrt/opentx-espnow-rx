@@ -1,5 +1,5 @@
 /* 
- * This file is part of the espnow_rc_rx distribution (https://github.com/tmertelj/espnow_rc_rx).
+ * This file is part of the opentx-espnow-rx (https://github.com/tmertelj/opentx-espnow-rx).
  * Copyright (c) 2019 Tomaz Mertelj.
  * 
  * This program is free software: you can redistribute it and/or modify  
